@@ -1,0 +1,353 @@
+#+TITLE: Section 2.1.4
+* 2.1.4 Interval Arithmetic
+We start with some methods for interval arithmetic:
+#+BEGIN_SRC scheme :session session
+(define (add-interval x y)
+  (make-interval (+ (lower-bound x)
+                    (lower-bound y))
+                 (+ (upper-bound x)
+                    (upper-bound y))))
+
+(define (mult-interval x y)
+  (let ((p1 (* (lower-bound x)
+               (lower-bound y)))
+        (p2 (* (lower-bound x)
+               (upper-bound y)))
+        (p3 (* (upper-bound x)
+               (lower-bound y)))
+        (p4 (* (upper-bound x)
+               (upper-bound y))))
+    (make-interval (min p1 p2 p3 p4)
+                   (max p1 p2 p3 p4))))
+
+(define (div-interval x y)
+  (mult-interval x
+                (make-interval
+                 (/ 1.0 (upper-bound y))
+                 (/ 1.0 (lower-bound y)))))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+** Ex. 2.7
+First we define the constructor and selectors:
+#+BEGIN_SRC scheme :session session :results value :exports both
+(define (make-interval a b) (cons a b))
+(define (lower-bound x) (car x))
+(define (upper-bound x) (cdr x))
+(make-interval 3 5)
+#+END_SRC
+
+#+RESULTS:
+: (3 . 5)
+
+** Ex. 2.8
+Using reasoning similar to the above arithmetic methods, we define an interval
+subtraction method:
+#+BEGIN_SRC scheme :session session :exports both
+(define (sub-interval x y)
+  (make-interval (- (lower-bound x)
+                    (upper-bound y))
+                 (- (upper-bound x)
+                    (lower-bound y))))
+
+(let ((interval-1 (make-interval -4 5))
+      (interval-2 (make-interval 2 7)))
+  (sub-interval interval-1 interval-2))
+#+END_SRC
+
+#+RESULTS:
+: (-11 . 3)
+
+** Ex. 2.9
+The /width/ of an interval is the half distance between its upper and lower
+bounds. In some cases, the width of the result from combining two intervals is a
+function of the widths of the individual intervals, while in with other cases
+it isn't. Show that the width of the sum of two interval is only a function of
+the individual widths being added, and that this isn't the case for
+multiplication and division.
+
+Let $\text{int}_a = (w, x)$ and $\text{int}_b = (y, z)$ be two intervals.
+\begin{equation}
+w(a) = \frac{\text{upper}(a) - \text{lower}(a)}{2}
+\end{equation}
+\begin{align*}
+w(\text{int}_a+\text{int}_b) &= \frac{\text{upper}(\text{int}_a+\text{int}_b) - \text{lower}(\text{int}_a+\text{int}_b)}{2} \\
+       &= \frac{(w + y) - (x + z)}{2} \\
+       &= \frac{(w-x) + (y-z)}{2} \\
+       &= w(a) + w(b)
+\end{align*}
+
+to see that this does not show for multiplication:
+$w((2, 4)) = 1$ and $w((1, 5)) = 2$, but $w((2, 20)) = 9$.
+
+** Ex. 2.10
+The earlier definition for dividing intervals doesn't make sense for divisor intervals
+that cross 0, so we'll modify it to avoid that.
+#+BEGIN_SRC scheme :results output :session session :exports both
+(define (safe-div-interval x y)
+  (if (< (* (lower-bound y) (upper-bound y)) 0)
+      (error "Cannot divide by an interval that spans 0")
+      (div-interval x y)))
+(safe-div-interval (make-interval 3 3) (make-interval -5 6))
+#+END_SRC
+
+#+RESULTS:
+: ERROR: In procedure scm-error:
+: Cannot divide by an interval that spans 0
+:
+: Entering a new prompt.  Type `,bt' for a backtrace or `,q' to continue.
+: scheme@(guile-user) [26]>
+
+** Ex. 2.11
+It's possible to divide ~mul-interval~ into nine cases where only one requires more
+than two multiplications. This isn't pretty though...
+#+BEGIN_SRC scheme :session session
+(define (mult-interval-2 x y)
+  (cond
+   ((and (negative? (* (lower-bound x) (upper-bound x)))
+         (negative? (* (lower-bound y) (upper-bound y))))
+    (make-interval (min
+                    (* (lower-bound x) (upper-bound y))
+                    (* (lower-bound y) (upper-bound x)))
+                   (max
+                    (* (lower-bound x) (lower-bound y))
+                    (* (upper-bound x) (upper-bound y)))))
+   ((and (negative? (lower-bound x))
+        (negative? (upper-bound x))
+        (negative? (lower-bound y))
+        (negative? (upper-bound y)))
+   (make-interval (* (upper-bound x) (upper-bound y)) (* (lower-bound x) (lower-bound y))))
+   ((and (positive? (lower-bound x))
+        (positive? (upper-bound x))
+        (positive? (lower-bound y))
+        (positive? (upper-bound y)))
+   (make-interval (* (lower-bound x) (lower-bound y)) (* (upper-bound x) (upper-bound y))))
+   ((and (negative? (lower-bound x))
+        (positive? (upper-bound x))
+        (positive? (lower-bound y))
+        (positive? (upper-bound y)))
+   (make-interval (* (lower-bound x) (upper-bound y)) (* (upper-bound x) (upper-bound y))))
+   ((and (positive? (lower-bound x))
+        (positive? (upper-bound x))
+        (negative? (lower-bound y))
+        (positive? (upper-bound y)))
+   (make-interval (* (upper-bound x) (lower-bound y)) (* (upper-bound x) (upper-bound y))))
+   ((and (negative? (lower-bound x))
+        (negative? (upper-bound x))
+        (positive? (lower-bound y))
+        (positive? (upper-bound y)))
+   (make-interval (* (lower-bound x) (upper-bound y)) (* (upper-bound x) (lower-bound y))))
+   ((and (positive? (lower-bound x))
+        (positive? (upper-bound x))
+        (negative? (lower-bound y))
+        (negative? (upper-bound y)))
+   (make-interval (* (upper-bound x) (lower-bound y)) (* (lower-bound x) (upper-bound y))))
+   ((and (negative? (lower-bound x))
+        (negative? (upper-bound x))
+        (negative? (lower-bound y))
+        (positive? (upper-bound y)))
+   (make-interval (* (lower-bound x) (upper-bound y)) (* (lower-bound x) (lower-bound y))))
+   ((and (positive? (lower-bound x))
+        (positive? (upper-bound x))
+        (negative? (lower-bound y))
+        (positive? (upper-bound y)))
+   (make-interval (* (upper-bound x) (lower-bound y)) (* (upper-bound x) (upper-bound y))))))
+
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+Here are some tests:
+#+BEGIN_SRC scheme :session session :exports both
+(mult-interval-2 (make-interval -4.0 10)
+                 (make-interval 8 20.0))
+#+END_SRC
+
+#+RESULTS:
+: (-80.0 . 200.0)
+
+#+BEGIN_SRC scheme :session session :exports both
+(mult-interval-2 (make-interval -10.0 4)
+                 (make-interval 9 20.0))
+#+END_SRC
+
+#+RESULTS:
+: (-200.0 . 80.0)
+
+#+BEGIN_SRC scheme :session session :exports both
+(mult-interval-2 (make-interval -4 10)
+                 (make-interval -9 20.0))
+#+END_SRC
+
+#+RESULTS:
+: (-90.0 . 200.0)
+
+#+BEGIN_SRC scheme :session session :exports both
+(mult-interval-2 (make-interval 4 10)
+                 (make-interval 9 20.0))
+#+END_SRC
+
+#+RESULTS:
+: (36 . 200.0)
+
+#+BEGIN_SRC scheme :session session :exports both
+(mult-interval-2 (make-interval 4 10)
+                 (make-interval -9 -20.0))
+#+END_SRC
+
+#+RESULTS:
+: (-90 . -80.0)
+
+#+BEGIN_SRC scheme :session session :exports both
+(mult-interval-2 (make-interval -10 -4)
+                 (make-interval 9 20.0))
+#+END_SRC
+
+#+RESULTS:
+: (-200.0 . -36)
+
+#+BEGIN_SRC scheme :session session :exports both
+(mult-interval-2 (make-interval 4 10)
+                 (make-interval -8 20.0))
+#+END_SRC
+
+#+RESULTS:
+: (-80 . 200.0)
+
+** Ex. 2.12
+Now we define an alternate constructor for intervals, ~make-center-percent~ that
+uses a center and percentage tolerance to create an interval. We also define
+new selectors to retrieve the center and tolerance.
+#+BEGIN_SRC scheme :session session :exports both
+(define (make-center-percent center percent)
+  (make-interval (* center (- 1 (/ percent 100.0)))
+                 (* center (+ (/ percent 100.0) 1.0))))
+
+(define (center i)
+  (/ (+ (lower-bound i)
+        (upper-bound i))
+     2))
+
+(define (width i)
+  (/ (- (upper-bound i)
+        (lower-bound i))
+     2))
+
+(define (percent i)
+  (* (/ (width i) (center i)) 100))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+** Ex. 2.13
+Under small percentages, there we can write the percentage tolerance
+of the product of two intervals that we as a function of the
+individual percentage tolerances.
+
+Let $a$ have center $c_a$ and percent $p_a$, $b$ have center $c_b$ and percent
+$p_b$. the upper bound of $a*b$ must be $c_a(1 + \frac{p_a}{100})c_b(1
++\frac{p_b}{100})$, and the lower bound must be $c_a(1 - \frac{p_a}{100})c_b(1
+-\frac{p_b}{100})$,
+\begin{align*}
+\frac{p_{(ab)}}{100} &= \frac{\text{width}(ab)}{\text{center}(ab)} \\
+         &= \frac{\text{upper}(ab) - \text{lower}(ab)}{\text{upper}(ab) + \text{lower}(ab)} \\
+    &= \frac{c_a (1+ \frac{p_a}{100}) c_b (1+ \frac{p_b}{100}) - c_a (1- \frac{p_a}{100}) c_b (1- \frac{p_b}{100})}
+      {c_a (1+ \frac{p_a}{100}) c_b (1+ \frac{p_b}{100}) + c_a (1- \frac{p_a}{100}) c_b (1- \frac{p_b}{100})}  \\
+  &= \frac{c_a c_b (1 + \frac{p_a p_b}{10000} + \frac{p_a + p_b}{100}) - c_a c_b (1 + \frac{p_a p_b}{10000} - \frac{p_a + p_b}{100})}
+    {c_a c_b (1 + \frac{p_a p_b}{10000} + \frac{p_a + p_b}{100}) + c_a c_b (1 + \frac{p_a p_b}{10000} - \frac{p_a + p_b}{100})} \\
+\end{align*}
+Since $\frac{p_a p_b}{10000} \approx 0$ for small $p_a$ and $p_b$...
+\begin{align*}
+ p_{(ab)} &= \frac{c_a c_b (1 + \frac{p_a + p_b}{100}) - c_a c_b (1 - \frac{p_a + p_b}{100})}
+    {c_a c_b (1 + \frac{p_a + p_b}{100}) + c_a c_b (1 - \frac{p_a + p_b}{100})} \\
+  &= \frac{2 \frac{p_a + p_b}{100}}{2} \\
+  &= \frac{p_a + p_b}{100} \implies p_{(ab)} = p_a + p_b
+\end{align*}
+** Ex. 2.14
+The whole point of this so far was to be able to compute the parallel equivalent
+resistance of two resistors using tolerances:
+\begin{equation*}
+R_p = \frac{1}{\frac{1}{R_1} + \frac{1}{R_2}}
+\end{equation*}
+which can also be written as:
+\begin{equation*}
+\frac{r_1 r_2}{r_1+r_2}
+\end{equation*}
+
+We're given two programs for computing the above:
+#+BEGIN_SRC scheme :session session
+(define (par1 r1 r2)
+  (div-interval
+   (mult-interval r1 r2)
+   (add-interval r1 r2)))
+(define (par2 r1 r2)
+  (let ((one (make-interval 1 1)))
+    (div-interval
+     one
+     (add-interval
+      (div-interval one r1)
+      (div-interval one r2)))))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+And now we need to show that these give different results even though they're
+algebraically equivalent.
+
+First we'll look at $\frac{A}{A}$ and $\frac{A}{B}$ for two intervals.
+#+BEGIN_SRC scheme :session session
+(define int-a (make-center-percent 100 10))
+(define int-b (make-center-percent 50 5))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+#+BEGIN_SRC scheme :session session :exports both
+(center (div-interval int-a int-a))
+#+END_SRC
+
+#+RESULTS:
+: 1.0202020202020203
+
+#+BEGIN_SRC scheme :session session :exports both
+(center (div-interval int-a int-b))
+#+END_SRC
+
+#+RESULTS:
+: 2.0150375939849625
+So $\frac{A}{A} \neq 1$ in this case. We can also see that we get different
+results for the two parallel resistance formulas:
+#+BEGIN_SRC scheme :session session :exports both
+(par1 int-a int-b)
+#+END_SRC
+
+#+RESULTS:
+: (26.307692307692307 . 42.00000000000001)
+
+#+BEGIN_SRC scheme :session session :exports both
+(par2 int-a int-b)
+#+END_SRC
+
+#+RESULTS:
+: (31.090909090909093 . 35.53846153846154)
+
+** Ex. 2.15
+The claim here is that ~par-2~ is better because ~par-1~ produces unnecessarily
+loose error bounds. This is correct, because as we see above $\frac{A}{A} \neq
+1$ and is really just an approximation. Each new operation with intervals adds
+more uncertainty, so even though the two formulas are algebraically equivalent
+for numbers, ~par-1~ introduces more uncertainty by involving more operations
+with intervals. To go from ~par-2~ to ~par-1~, we multiply the whole formula by
+$\frac{A}{A}\frac{B}{B}$, which we know is only an approximation of $1$.
+** Ex. 2.16
+This is the [[https://en.wikipedia.org/wiki/Interval_arithmetic#Dependency_problem][dependency problem]], which shows that repeated occurrences of
+intervals in a calculation leads to unwanted expansion of the resulting
+interval. This means that there is no way to write a program that completely
+avoids this problem, since we'll always be able to rewrite an expression to be
+algebraically equivalent but less precise due repeated interval operations.

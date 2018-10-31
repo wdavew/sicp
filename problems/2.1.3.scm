@@ -1,107 +1,120 @@
-;2.2
-; abstraction of line segments
-(define (make-point x y)
-  (cons x y))
+;2.1.4
+;alternate representation of pairs
+(define (cons x y)
+  (lambda (m) (m x y)))
 
-(define (x-point point)
-  (car point))
+(define (car z)
+  (z (lambda (p q) p)))
 
-(define (y-point point)
-  (cdr point))
+(define (cdr z)
+  (z (lambda (p q) q)))
 
-(define (make-segment p1 p2)
-  (cons p1 p2))
+(assert
+ (= (car (cons 5 3))
+    5))
 
-(define (start-segment s)
-  (car s))
+(assert
+ (= (cdr (cons 5 3))
+    3))
 
-(define (end-segment s)
-  (cdr s))
 
-(define (print-point p)
-  (newline)
-  (display "(") 
-  (display (x-point p))
-  (display ",")
-  (display (y-point p))
-  (display ")"))
+;2.1.5
+;represent pairs of nonnegative integers using just numbers
+;and arithmetic operations so that the pair a b
+;is the prodcut of 2^a*3^b
 
-(define (midpoint-segment s) 
-  (let ((x1 (x-point (start-segment s)))
-       (x2 (x-point (end-segment s)))
-       (y1 (y-point (start-segment s)))
-       (y2 (y-point (end-segment s))))
-    (make-point (/ (+ x1 x2) 2) (/ (+ y1 y2) 2))))
-  
-(print-point (midpoint-segment
-    (make-segment (make-point 3 2) (make-point 4 -1))))
+;2 and 3 are prime, so any a and b will result in unique number
+; since it will be represented as a prime factorization
 
-;2.3
-;abstraction of rectangles
-;method 1
-(define (make-rec base height)
-  (cons base height))
+(define (cons a b)
+  (* (expt 2 a) (expt 3 b)))
 
-(define (rec-length rec)
-    (abs
-     (-
-      (x-point (end-segment (car rec)))
-      (x-point (start-segment (car rec))))))
+(define (count-factors divisor num)
+  (if
+   (not (= (remainder num divisor) 0))
+   0
+   (+ 1 (count-factors divisor (/ num divisor)))))
 
-(define (rec-height rec)
-  (abs
-   (-
-    (y-point (end-segment (cdr rec)))
-    (y-point (start-segment (cdr rec))))))
+(define (car z)
+  (count-factors 2 z))
 
-(define (perimeter rec)
-  (+ (* 2 (rec-length rec)) (* 2 (rec-height rec))))
+(define (cdr z)
+  (count-factors 3 z))
 
-(define (area rec)
-  (* (rec-length rec) (rec-height rec)))
+;2.1.6
+;Church numerals
+;representation of numbers and arithmetic
+;using just lambdas, no numbers
+(define zero (lambda (f) (lambda (x) x)))
 
-;should be 6
+(define (add-1 n)
+  (lambda (f) (lambda (x) (f ((n f) x)))))
+
+(define one (lambda (f) (lambda (x) (f x))))
+
+(define two (lambda (f) (lambda (x) (f (f x)))))
+
+(define (add a b)
+  (lambda (f)
+    (lambda (x)
+      ((a f) ((b f) x)))))
+
+;fn to test with
+(define (inc x)
+  (+ x 1))
+
 (assert
  (=
-  (area (make-rec
-   (make-segment (make-point 2 3) (make-point 5 5))
-   (make-segment (make-point 2 3) (make-point 2 5))))
+  ((zero inc) 0)
+  0))
+
+(assert
+ (=
+  ((one inc) 1)
+  2))
+
+(assert
+ (=
+  ((two inc) 2)
+  4))
+
+(assert
+ (=
+  (((add one one) inc) 2)
+  4))
+
+(assert
+ (=
+  (((add one two) inc) 3)
   6))
 
-;should be 10
-(assert
- (=
-  (perimeter (make-rec
-    (make-segment (make-point 2 3) (make-point 5 5))
-    (make-segment (make-point 2 3) (make-point 2 5))))
-  10))
+;just because
+(define (church-mult a b)
+  (lambda (f)
+    (lambda (x) ((a (b f)) x))))
 
-;alternate representation of rectangle
-;because of the abstraction barrier between area / perimeter
-;and the rectangle constructor and selectors,
-;the original abstraction of area and perimeter works unchanged
-(define (make-rec2 p1 p2)
-  (cons p1 p2))
+(define (church-expt a b)
+  (lambda (f)
+    (lambda (x) (((b a) f) x))))
 
-(define (rec-height rec)
-  (abs
-   (- (y-point (cdr rec))
-      (y-point (car rec)))))
-
-(define (rec-length rec)
-  (abs
-   (- (x-point (cdr rec))
-      (x-point (car rec)))))
+(define three (add one two))
 
 (assert
  (=
-  (area (make-rec2
-   (make-point 2 3) (make-point 5 5)))
-  6))
+  (((church-mult two one) inc) 0)
+  2))
 
-;should be 10
 (assert
  (=
-  (perimeter (make-rec2
-   (make-point 2 3) (make-point 5 5)))
-  10))
+  (((church-mult two two) inc) 0)
+  4))
+
+(assert
+ (=
+  (((church-expt two three) inc) 0)
+  8))
+
+(assert
+ (=
+  (((church-expt three three) inc) 0)
+  27))
