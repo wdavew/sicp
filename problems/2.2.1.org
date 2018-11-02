@@ -57,7 +57,7 @@ Here we revisit the coin sum program from earlier on:
 
 Now we want to refactor this so that we can easily use a different currency or
 set of denominations. Right now, that knowledge is partly encoded in
-~count-change~ and partly in ~first-denomation~. (But that was before we had
+~count-change~ and partly in ~first-denomination~. (But that was before we had
 lists). To do so, we'll use a list of denominations.
 
 #+BEGIN_SRC scheme :session
@@ -131,3 +131,149 @@ proceeds to check every other remaining combination of coins.
 
 #+RESULTS:
 : 104561
+** Ex. 2.20
+We can use dotted-tail notation to define variadic functions in Scheme.
+#+BEGIN_SRC scheme
+(define (f x y .z) <body>)
+#+END_SRC
+We'll use this notation to write ~same-parity~, which takes one or more integers
+and returns a list of the provided integers with the same even-odd parity of
+the first.
+#+BEGIN_SRC scheme :exports both :session
+(define (filter pred items)
+  (cond ((null? items) items)
+        ((pred (car items)) (cons (car items) (filter pred (cdr items))))
+        (else (filter pred (cdr items)))))
+
+(define (same-parity a . rest)
+  (if (even? a)
+      (cons a (filter even? rest))
+      (cons a (filter odd? rest))))
+
+(same-parity 1 2 3 4 5 6 7)
+#+END_SRC
+
+#+RESULTS:
+| 1 | 3 | 5 | 7 |
+
+#+BEGIN_SRC scheme :exports both :session
+(same-parity 2 3 4 5 6 7)
+#+END_SRC
+
+#+RESULTS:
+| 2 | 4 | 6 |
+** Ex. 2.21
+Now we have ~map~, so we can establish a new abstraction barrier when processing
+lists that separates the details of transforming elements from the detail of
+extracting and combining elements with ~cons~, ~car~, and ~cdr~.
+
+Here we write two different definitions of ~square-list~:
+#+BEGIN_SRC scheme :exports both :session
+(define (square x) (* x x))
+
+(define (square-list items)
+  (if (null? items)
+      items
+      (cons (square (car items)) (square-list (cdr items)))))
+
+(square-list (list 1 2 3 4 5))
+#+END_SRC
+
+#+RESULTS:
+| 1 | 4 | 9 | 16 | 25 |
+
+#+BEGIN_SRC scheme :exports both :session
+(define (square-list items)
+  (map square items))
+
+(square-list (list 1 2 3 4 5))
+#+END_SRC
+
+#+RESULTS:
+| 1 | 4 | 9 | 16 | 25 |
+** Ex. 2.22
+Here is an iterative process for ~square-list~:
+#+BEGIN_SRC scheme :session
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things)
+              (cons (square (car things))
+                    answer))))
+  (iter items #nil))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+However, it produces the result in reverse order.
+#+BEGIN_SRC scheme :session :exports both
+(square-list (list 1 2 3 4 5))
+#+END_SRC
+
+#+RESULTS:
+| 25 | 16 | 9 | 4 | 1 |
+
+This happens because the our intermediate result is always in the ~cdr~ of the
+cons cell. Each consecutive elements gets squared and then placed in the ~car~
+of a ~cons~ cell with ~answer~, producing a reversed list.
+
+Here's another attempt, which still doesn't work:
+#+BEGIN_SRC scheme :session :exports both
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things)
+              (cons answer
+                    (square
+                     (car things))))))
+  (iter items #nil))
+
+(square-list (list 1 2 3 4 5))
+#+END_SRC
+#+RESULTS:
+: '(((((#nil . 1) . 4) . 9) . 16) . 25)
+
+The problem here is that the answer list now becomes "inverted" -- the nesting
+always occurs in the ~car~ of each cell rather than in the ~cdr~, so now in each
+~cons~ cell, the first item is a list, and the second is an integer.
+
+We can fix this by just using ~append~ instead of ~cons~ to combine the results.
+
+#+BEGIN_SRC scheme :session :exports both
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things)
+              (append answer
+                    (list (square
+                     (car things)))))))
+  (iter items #nil))
+
+(square-list (list 1 2 3 4 5))
+#+END_SRC
+
+#+RESULTS:
+| 1 | 4 | 9 | 16 | 25 |
+** Ex. 2.23
+Now we define ~for-each~, which applies a procedure to each element in a list,
+but does not produce a new list of the results.
+#+BEGIN_SRC scheme :session :exports both :results output
+(define (for-each proc items)
+  (cond ((null? items) #nil)
+        (else (proc (car items))
+              (for-each proc (cdr items)))))
+
+(for-each
+ (lambda (x) (newline) (display x))
+ (list 57 321 88))
+#+END_SRC
+
+#+RESULTS:
+:
+: 57
+: 321
+: 88
