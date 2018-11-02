@@ -1,5 +1,5 @@
-#+TITLE: 2.2.1
-* 2.2.1 Representing Sequences
+#+TITLE: 2.2.1: Representing Sequences
+* Problems
 ** Ex. 2.17
 Define ~last-pair~, which returns the list containing the last pair of the
 provided list.
@@ -31,3 +31,103 @@ the same elements in reverse order.
 
 #+RESULTS:
 | 4 | 3 | 2 | 1 |
+** Ex. 2.19
+Here we revisit the coin sum program from earlier on:
+#+BEGIN_SRC scheme :exports both :session
+(define (count-change amount)
+  (cc amount 5))
+(define (cc amount kinds-of-coins)
+  (cond ((= amount 0) 1)
+        ((or (< amount 0) (= kinds-of-coins 0)) 0)
+        (else (+ (cc amount
+                     (- kinds-of-coins 1))
+                 (cc (- amount (first-denomination kinds-of-coins))
+                     kinds-of-coins)))))
+(define (first-denomination kinds-of-coins)
+  (cond ((= kinds-of-coins 1) 1)
+        ((= kinds-of-coins 2) 5)
+        ((= kinds-of-coins 3) 10)
+        ((= kinds-of-coins 4) 25)
+        ((= kinds-of-coins 5) 50)))
+(count-change 100)
+#+END_SRC
+
+#+RESULTS:
+: 292
+
+Now we want to refactor this so that we can easily use a different currency or
+set of denominations. Right now, that knowledge is partly encoded in
+~count-change~ and partly in ~first-denomation~. (But that was before we had
+lists). To do so, we'll use a list of denominations.
+
+#+BEGIN_SRC scheme :session
+(define us-coins (list 50 25 10 5 1))
+(define uk-coins (list 100 50 20 10 5 2 1 0.5))
+
+(define (cc amount coin-values)
+  (cond ((= amount 0) 1)
+        ((or (< amount 0) (no-more? coin-values)) 0)
+        (else
+         (+ (cc amount (except-first-denomination coin-values))
+            (cc (- amount (first-denomination coin-values))
+                coin-values)))))
+
+(define (first-denomination coin-values)
+  (car coin-values))
+
+(define (except-first-denomination coin-values)
+  (cdr coin-values))
+
+(define (no-more? coin-values)
+  (null? coin-values))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+Now let's test the helper procedures:
+#+BEGIN_SRC scheme :exports both :session
+(first-denomination us-coins)
+#+END_SRC
+
+#+RESULTS:
+: 50
+
+#+BEGIN_SRC scheme :exports both :session
+(except-first-denomination us-coins)
+#+END_SRC
+
+#+RESULTS:
+| 25 | 10 | 5 | 1 |
+
+#+BEGIN_SRC scheme :exports both :session
+(no-more? us-coins)
+#+END_SRC
+
+#+RESULTS:
+: #f
+
+#+BEGIN_SRC scheme :exports both :session
+(cc 100 us-coins)
+#+END_SRC
+
+#+RESULTS:
+: 292
+
+#+BEGIN_SRC scheme :exports both :session
+(cc 100 uk-coins)
+#+END_SRC
+
+#+RESULTS:
+: 104561
+
+The order of the list does not affect the final result. We still reduce the
+problem in each call, so we'll eventually reach the base case. The procedure
+subtracts the value of the first coin in the list from the target and then
+proceeds to check every other remaining combination of coins.
+#+BEGIN_SRC scheme :exports both :session
+(cc 100 (reverse uk-coins))
+#+END_SRC
+
+#+RESULTS:
+: 104561
