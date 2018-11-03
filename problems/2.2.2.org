@@ -1,0 +1,439 @@
+#+TITLE: 2.2.2: Hierarchical Structures
+
+* Problems
+** Ex. 2.24
+Providing the box-and-pointer structure and tree diagram of:
+#+BEGIN_SRC scheme
+(list 1 (list 2 (list 3 4)))
+#+END_SRC
+
+Box and pointer:
+#+BEGIN_SRC artist
+  (1 (2 (3 4)))  ((2 (3 4)))
+  +----+----+    +----+----+
+  | .  | .  |--->| .  | /  |
+  +----+----+    +----+----+
+    |              |
+    v              v            ((3 4))
+  +----+         +----+----+    +----+----+
+  | 1  |         | .  | .  |--->| .  | /  |
+  +-+--+         +----+-+--+    +----+----+
+                   |               |
+                   v               v            (4)
+                 +----+         +----+----+    +----+----+
+                 | 2  |         | .  | .  |--->| .  | /  |
+                 +-+--+         +----+-+--+    +----+-+--+
+                                  |              |
+                                  v              v
+                                +----+         +----+
+                                | 3  |         | 4  |
+                                +-+--+         +-+--+
+#+END_SRC
+
+Tree:
+#+BEGIN_SRC artist
+          (1 (2 (3 4)))
+            /\
+           /  \ (2 (3 4)
+          /    X
+         1    / \ (3 4)
+             /   X
+            2   / \
+               /   \
+              3     4
+#+END_SRC
+** Ex. 2.25
+Give the combinations of ~cars~ and ~cdrs~ that will retrieve 7:
+
+#+BEGIN_SRC scheme
+(list 1 3 (list 5 7) 9)
+(list (list 7))
+(list 1 (list 2 (list 3 (list 4 (list 5 (list 6 7))))))
+#+END_SRC
+
+#+BEGIN_SRC scheme :exports both
+(define list1 (list 1 3 (list 5 7) 9))
+(car (cdr (car (cdr (cdr list1)))))
+#+END_SRC
+
+#+RESULTS:
+: 7
+
+#+BEGIN_SRC scheme :exports both
+(define list2 (list (list 7)))
+(car (car list2))
+#+END_SRC
+#+RESULTS:
+: 7
+
+#+BEGIN_SRC scheme :exports both
+(define list3 (list 1 (list 2 (list 3 (list 4 (list 5 (list 6 7)))))))
+(car (cdr (car (cdr (car (cdr (car (cdr (car (cdr (car (cdr list3))))))))))))
+#+END_SRC
+
+#+RESULTS:
+: 7
+
+The reason we can't just ~cdr~ all the way down the last one is because lists
+are sequences of ~cons~ cells.
+
+#+BEGIN_SRC scheme :exports both
+(list 1 (list 2 (list 3)))
+#+END_SRC
+
+#+RESULTS:
+| 1 | (2 (3)) |
+
+#+BEGIN_SRC scheme :exports both
+(cons 1 (cons (cons 2 (cons (cons 3 #nil) #nil)) #nil))
+#+END_SRC
+
+#+RESULTS:
+| 1 | (2 (3)) |
+** Ex. 2.26
+Given these two lists:
+#+BEGIN_SRC scheme :session
+(define x (list 1 2 3))
+(define y (list 4 5 6))
+#+END_SRC
+
+What does the interpreter print when evaluating the following?
+
+#+BEGIN_SRC scheme
+(append! x y)
+;-->  (1 2 3 4 5 6)
+#+END_SRC
+
+#+BEGIN_SRC scheme :session
+(cons x y)
+;; --> ((1 2 3) 4 5 6)
+#+END_SRC
+
+#+BEGIN_SRC scheme :session
+(list x y)
+;; --> ((1 2 3) (4 5 6))
+#+END_SRC
+** Ex. 2.27
+Here we write a ~deep-reverse~ procedure to reverse a list and all of its
+sublists.
+
+#+BEGIN_SRC scheme :session :exports both
+(define x (list (list 1 2) (list 3 4)))
+
+(define (deep-reverse items)
+  (cond ((null? items) items)
+        ((pair? (car items))
+         (append!
+          (deep-reverse (cdr items))
+          (list (deep-reverse (car items)))))
+        (else
+         (append!
+          (deep-reverse (cdr items))
+          (list (car items))))))
+
+(deep-reverse x)
+#+END_SRC
+
+#+RESULTS:
+| 4 | 3 |
+| 2 | 1 |
+
+** Ex. 2.28
+~fringe~ takes a tree as an argument and returns a list of the leaves of the
+tree in left-to-right order.
+#+BEGIN_SRC scheme :exports both :session
+(define x (list (list 1 2) (list 3 4)))
+
+(define (fringe tree)
+  (cond ((null? tree) tree)
+        ((not (pair? tree)) (list tree))
+        (else
+         (append! (fringe (car tree)) (fringe (cdr tree))))))
+
+(fringe x)
+#+END_SRC
+
+#+RESULTS:
+| 1 | 2 | 3 | 4 |
+#+BEGIN_SRC scheme :exports both :session
+(fringe (list x x))
+#+END_SRC
+
+#+RESULTS:
+| 1 | 2 | 3 | 4 | 1 | 2 | 3 | 4 |
+
+** Ex. 2.29
+A binary mobile has two branches. Each branch has a length, and hangs either a
+weight or another binary mobile.
+
+We'll represent binary mobiles using lists:
+#+BEGIN_SRC scheme :session
+(define (make-mobile left right)
+  (list left right))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+The branches will have a ~length~ and a ~structure~, which could be either a
+number to represent weight, or another list to represent a mobile.
+
+#+BEGIN_SRC scheme :session
+(define (make-branch length structure)
+  (list length structure))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+*** a. Writing selectors
+First we need selectors to return the branches of a mobile, the length of a
+branch, and the structure of a branch.
+#+BEGIN_SRC scheme :session
+(define (left-branch mobile)
+  (car mobile))
+
+(define (right-branch mobile)
+  (cadr mobile))
+
+(define (length branch)
+  (car branch))
+
+(define (structure branch)
+  (cadr branch))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+*** b. Total weight
+Now we'll write a procedure to return the total weight of a mobile.
+#+BEGIN_SRC scheme :exports both :session
+(define (total-weight mobile)
+  (cond ((null? mobile) 0)
+        ((not (pair? mobile)) mobile)
+        (else (+ (total-weight (structure (left-branch mobile)))
+                 (total-weight (structure (right-branch mobile)))))))
+
+(define lbranch (make-branch 5 10))
+(define rbranch (make-branch 5 10))
+(define a (make-mobile lbranch rbranch))
+(define llbranch (make-branch 8 a))
+(define rrbranch (make-branch 3 a))
+
+(define b (make-mobile llbranch rrbranch))
+(total-weight b)
+#+END_SRC
+
+#+RESULTS:
+: 40
+
+*** c. Checking balance
+A mobile is /balanced/ if the torque of the top left branch is equal to that of
+the top right branch, and all of the sub-mobiles are balanced as well. (Where
+torque is the product of the rod and the weight held by that rod).
+
+#+BEGIN_SRC scheme :exports both :session
+(define (torque branch)
+  (* (length branch) (total-weight (structure branch))))
+
+(define (balanced? mobile)
+  (cond ((null? mobile) #t)
+        ((not (pair? mobile)) #t)
+        (else
+         (and
+          (= (torque (left-branch mobile)) (torque (right-branch mobile)))
+          (balanced? (structure (left-branch mobile)))
+          (balanced? (structure (right-branch mobile)))))))
+
+(balanced? b)
+#+END_SRC
+
+#+RESULTS:
+: #f
+#+BEGIN_SRC scheme :exports both :session
+(balanced? a)
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+*** d. An alternative representation
+What if we instead used these constructors:
+#+BEGIN_SRC scheme :session
+(define (make-mobile left right)
+  (cons left right))
+
+(define (make-branch length structure)
+  (cons length structure))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+Now the left and right branches are stored in a ~cons~ cell, and branches
+themselves are represented as ~cons~ cells. Originally, we had these represented
+as lists.
+
+Our ~total-weight~ and ~balanced~ procedures will continue to work if we can
+provide new selectors for the ~right-branch~ and ~structure~ components. Since
+these were previously stored in lists, we can now access them with a single
+~cdr~ (instead of a ~cadr~).
+
+This demonstrates one of the advantages of abstraction barriers. We wrote the
+more complicated ~total-weight~ and ~balanced~ procedures without them assuming
+anything about the internal structure of mobiles and branches. They only
+accessed those through selectors, which did know something about the internal
+structure. This is why we can get away with just updating the selectors after
+changing the internal representation.
+
+#+BEGIN_SRC scheme :session
+(define (right-branch mobile)
+  (cdr mobile))
+
+(define (structure branch)
+  (cdr branch))
+
+(define lbranch (make-branch 5 10))
+(define rbranch (make-branch 5 10))
+
+(define a (make-mobile lbranch rbranch))
+(define llbranch (make-branch 8 a))
+(define rrbranch (make-branch 3 a))
+
+(define b (make-mobile llbranch rrbranch))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+#+BEGIN_SRC scheme :exports both :session
+(total-weight a)
+#+END_SRC
+
+#+RESULTS:
+: 20
+
+#+BEGIN_SRC scheme :exports both :session
+(total-weight b)
+#+END_SRC
+
+#+RESULTS:
+: 40
+
+#+BEGIN_SRC scheme :exports both :session
+(balanced? a)
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+#+BEGIN_SRC scheme :exports both :session
+(balanced? b)
+#+END_SRC
+
+#+RESULTS:
+: #f
+** Ex. 2.30
+Analogous to ~square-list~, we'll now define ~square-tree~, both directly and
+with ~map~.
+
+Directly:
+#+BEGIN_SRC scheme :exports both :session
+(define (square x) (* x x))
+
+(define (square-tree tree)
+  (cond ((null? tree) #nil)
+        ((not (pair? tree)) (square tree))
+        (else (cons (square-tree (car tree)) (square-tree (cdr tree))))))
+
+(square-tree
+ (list 1
+       (list 2 (list 3 4) 5)
+       (list 6 7)))
+#+END_SRC
+
+#+RESULTS:
+| 1 | (4 (9 16) 25) | (36 49) |
+
+With map:
+#+BEGIN_SRC scheme :exports both :session
+(define (square-tree tree)
+  (map (lambda (subtree)
+         (if (pair? subtree)
+             (square-tree subtree)
+             (square subtree)))
+       tree))
+
+(square-tree
+ (list 1
+       (list 2 (list 3 4) 5)
+       (list 6 7)))
+#+END_SRC
+
+#+RESULTS:
+| 1 | (4 (9 16) 25) | (36 49) |
+
+In the version using ~map~, we treat each tree as a sequence of subtrees and
+apply the ~square-tree~ procedure to each. If we reach a leaf, we return the
+squared value.
+
+** Ex. 2.31
+Now we'll define a generic ~tree-map~ procedure with which we can redefine our
+~square-tree~ procedure.
+
+#+BEGIN_SRC scheme :exports both :session
+(define (tree-map proc tree)
+  (cond ((null? tree) tree)
+        ((not (pair? tree)) (proc tree))
+        (else (cons (tree-map proc (car tree)) (tree-map proc (cdr tree))))))
+
+(define (square-tree tree)
+  (tree-map square tree))
+
+(square-tree
+ (list 1
+       (list 2 (list 3 4) 5)
+       (list 6 7)))
+#+END_SRC
+
+#+RESULTS:
+| 1 | (4 (9 16) 25) | (36 49) |
+
+** Ex. 2.32
+We can represent the powerset of a set of elements as a list of lists. Here is
+the procedure for doing so:
+#+BEGIN_SRC scheme :exports both
+(define (subsets s)
+  (if (null? s)
+      (list s)
+      (let ((rest (subsets (cdr s))))
+        (append!
+         rest
+         (map
+          (lambda (subset) (cons (car s) subset))
+          rest)))))
+
+(subsets (list 1 2 3))
+#+END_SRC
+
+#+RESULTS:
+|---+---+---|
+| 3 |   |   |
+| 2 |   |   |
+| 2 | 3 |   |
+| 1 |   |   |
+| 1 | 3 |   |
+| 1 | 2 |   |
+| 1 | 2 | 3 |
+
+Here's an explanation of how it works:
+1. The powerset of the empty set is the empty set is the empty set itself, so if
+   ~s~ is null, we return a list of an empty list --> ~(())~.
+2. Otherwise, we can take the first element out. The powerset contains all of
+   the subsets that do not contain this element, combined with all of the
+   subsets that do contain it. (This is analogous to the ~count-change~
+   problem).
+3. We call ~subset~ on the remaining elements (using ~cdr~) -- we'll refer to
+   this as ~rest~. ~rest~ contains the powerset of the elements except for the
+   first. Now we'll append to ~rest~ a list of the sets in ~rest~ but with ~(car
+   s)~ added on. To do this, we ~map~ over ~rest~ and ~cons~ ~(car s)~ to each set.
