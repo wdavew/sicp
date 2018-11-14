@@ -21,7 +21,7 @@ given an initial value.
 
 To define map, we combine the result of applying the mapping procedure to the
 first element of the list with the rest of the accumulated list.
-#+BEGIN_SRC scheme :exports both :session
+#+BEGIN_SRC scheme :exports both
 (define (map p sequence)
   (accumulate
    (lambda (x y) (cons (p x) y))
@@ -32,7 +32,6 @@ first element of the list with the rest of the accumulated list.
 #+END_SRC
 
 #+RESULTS:
-| 2 | 4 | 6 | 8 |
 
 For append, we just use ~cons~ as our combining procedure. By using ~seq2~ as
 the initial value, we recursively ~cons~ the first element of ~seq1~ with the rest of the
@@ -156,7 +155,7 @@ elementwise to each list.
 
 #+BEGIN_SRC scheme :exports both :session
 (define (dot-product v w)
-  (accumulate + 0 (map * v w))
+  (accumulate + 0 (map * v w)))
 
 (dot-product (list 1 2 3) (list 4 5 6))
 #+END_SRC
@@ -231,10 +230,16 @@ example:
 (cons 1 (cons 2 (cons 3 (cons 4 #nil))))
 #+END_SRC
 
+#+RESULTS:
+| 1 | 2 | 3 | 4 |
+
 ~fold-left~ also accumulates, but in the other direction:
 #+BEGIN_SRC scheme
 (cons (cons (cons (cons #nil 1) 2) 3) 4)
 #+END_SRC
+
+#+RESULTS:
+: '((((#nil . 1) . 2) . 3) . 4)
 
 #+BEGIN_SRC scheme :session
 (define (fold-left op initial sequence)
@@ -310,3 +315,204 @@ the ~car~ of the sequence, which will formed the reversed list.
 
 #+RESULTS:
 | 4 | 3 | 2 | 1 |
+** Ex. 2.40
+~unique-pairs~ generates the sequence of pairs $(i, j)$ with $1 \leq j < i \leq
+n$ for a given $n$. We'll define ~unique-pairs~, and then use it to simplify the definition for
+~prime-sum-pairs~ earlier in this chapter.
+
+To define ~unique-pairs~, we can map over the interval $(1, n)$, and then for
+each $i$ in that interval, map along the interval $(1, i)$. We can then generate
+a pair $(i, j)$, for each $j$ in the final interval.
+
+
+First we need to define some helpers functions (most of these are defined
+earlier in the chapter)
+#+BEGIN_SRC scheme :session
+(define (flatmap proc seq)
+  (accumulate append #nil (map proc seq)))
+
+(define (enumerate low high)
+  (if (< high low) #nil
+      (cons low
+            (enumerate (+ 1 low)
+                       high))))
+(define (divides? a b)
+  (= (remainder b a ) 0))
+
+(define (square x) (* x x))
+
+(define (smallest-divisor n divisor)
+  (cond ((> (square divisor) n) n)
+        ((divides? divisor n) divisor)
+        (else (smallest-divisor n (+ 1 divisor)))))
+
+(define (prime? n)
+  (= (smallest-divisor n 2) n))
+
+(define (prime-sum? pair)
+  (prime? (+ (car pair) (cadr pair))))
+
+(define (make-pair-sum pair)
+  (list (car pair) (cadr pair) (+ (car pair) (cadr pair))))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+#+BEGIN_SRC scheme :session :exports both
+(define (unique-pairs n)
+  (flatmap
+   (lambda (i)
+     (map (lambda (j) (list i j))
+          (enumerate 1 (- i 1))))
+   (enumerate 1 n)))
+
+(define (prime-sum-pairs n)
+  (map make-pair-sum
+       (filter prime-sum? (unique-pairs n))))
+
+(prime-sum-pairs 6)
+#+END_SRC
+
+#+RESULTS:
+| 2 | 1 |  3 |
+| 3 | 2 |  5 |
+| 4 | 1 |  5 |
+| 4 | 3 |  7 |
+| 5 | 2 |  7 |
+| 6 | 1 |  7 |
+| 6 | 5 | 11 |
+** Ex. 2.41
+Using a similar approach, we can write a procedure to find all ordered triples
+of distinct positive integers $i, j, k \leq n$ such that $i + j + k = s$.
+
+#+BEGIN_SRC scheme :session :exports both
+(define (unique-triples n)
+  (flatmap (lambda (i)
+         (flatmap (lambda (j)
+                (map (lambda (k) (list i j k))
+                     (enumerate 1 (- j 1))))
+              (enumerate 1 (- i 1))))
+       (enumerate 1 n)))
+
+(define (sum list) (accumulate + 0 list))
+(define (sum-to-k? k) (lambda (l) (= (sum l) k)))
+
+(define (make-triple-sum l)
+  (append l (list (sum l))))
+
+(define (k-sum-pairs n s)
+  (map make-triple-sum
+   (filter (sum-to-k? s) (unique-triples n))))
+
+(k-sum-pairs 12 12)
+#+END_SRC
+
+#+RESULTS:
+| 5 | 4 | 3 | 12 |
+| 6 | 4 | 2 | 12 |
+| 6 | 5 | 1 | 12 |
+| 7 | 3 | 2 | 12 |
+| 7 | 4 | 1 | 12 |
+| 8 | 3 | 1 | 12 |
+| 9 | 2 | 1 | 12 |
+** Ex. 2.42
+Now we use nested sequence to find solutions to the eight-queens puzzle (except
+our procedure should work for any number of queens). We want to find all of the
+possible ways to place $n$ queens on a chessboard such that none of them are in
+check with each other.
+
+The recursive approach we take here is to assume we've solved the problem for
+$k-1$ queens (so we have one queen in each of the first $k-1$ columns). Then,
+for each of those solutions, we can generate a new set of positions with a queen
+in each row of the $k^\text{th}$ column. After filtering all of those positions to
+only those that are valid, we'll arrive at the set of solutions for $k$ queens.
+
+#+ATTR_HTML: width="150px"
+#+CAPTION: A solution to the eight-queens puzzle
+[[./images/eightqueens.png]]
+
+
+#+BEGIN_SRC scheme :exports both :session
+(define empty-board #nil)
+
+(define (get-row pos)
+  (car pos))
+
+(define (get-col pos)
+  (cdr pos))
+
+(define (make-position row col)
+  (cons row col))
+
+(define (adjoin-position row col rest-of-queens)
+  (append rest-of-queens (list (make-position row col))))
+
+(define (same-row? pos1 pos2)
+  (= (get-row pos1) (get-row pos2)))
+
+(define (same-diag? pos1 pos2)
+  (=
+   (abs (- (get-row pos2)
+           (get-row pos1)))
+   (abs (- (get-col pos2)
+           (get-col pos1)))))
+
+(define (safe? col positions)
+  (let ((pos-to-check (car (filter
+                            (lambda (pos) (= (get-col pos) col))
+                            positions)))
+        (other-positions (filter
+                          (lambda (pos) (not (= (get-col pos) col)))
+                          positions)))
+    (= 0 (length (filter (lambda (x)
+                           (or (same-row? x pos-to-check)
+                               (same-diag? x pos-to-check)))
+                         other-positions)))))
+
+(define (queens board-size)
+  (define (queen-cols k)
+    (if (= k 0)
+        (list empty-board)
+        (filter
+         (lambda (positions) (safe? k positions))
+         (flatmap
+          (lambda (rest-of-queens)
+            (map (lambda (new-row)
+                   (adjoin-position
+                    new-row k rest-of-queens))
+                 (enumerate 1 board-size)))
+          (queen-cols (- k 1))))))
+  (queen-cols board-size))
+
+(length (queens 8))
+#+END_SRC
+
+#+RESULTS:
+: 92
+#+BEGIN_SRC scheme :exports both :session
+(queens 4)
+#+END_SRC
+
+#+RESULTS:
+| (2 . 1) | (4 . 2) | (1 . 3) | (3 . 4) |
+| (3 . 1) | (1 . 2) | (4 . 3) | (2 . 4) |
+** Ex. 2.43
+Here's an alternate ordering of the nested mappings in the ~flatmap~ portion of
+the n-queens program, which runs much slower.
+
+#+BEGIN_SRC scheme
+(flatmap
+ (lambda (new-row)
+   (map (lambda (rest-of-queens)
+          (adjoin-position new-row k rest-of-queens))
+        (queen-cols (- k 1))))
+ (enumerate-interval 1 board-size))
+#+END_SRC
+
+#+RESULTS:
+
+This formulation is significantly less efficient because it makes $n$ recursive
+calls, where $n$ is the size of the board. In the earlier procedure, we instead
+only make a single recursive call. If that earlier porcedure solves the puzzle
+in time $T$, we can expect this formulation to solve it in roughly $T^n$ time.
