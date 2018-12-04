@@ -1,0 +1,292 @@
+#+TITLE: 2.2.4
+* 2.2.4 Example: A Picture Language
+** Introduction
+As a way of demonstrating the usefuleness of abstraction and closure, we now
+look at a language for drawing pictures.
+
+The language has a single primitive: /painter/. We can combine painters with
+operations that produce new painters. For example, =below= takes two painters
+and produces a new painter that produces the image of the first painter below
+the second painter's image.
+
+Continuing in this way, we can create complex painters by combining simpler ones
+-- this is because painters are /closed/ under these operations.
+
+#+BEGIN_SRC emacs-lisp
+(setq geiser-default-implementation 'racket)
+#+END_SRC
+
+#+RESULTS:
+: racket
+
+#+BEGIN_SRC scheme :session
+(require sicp)
+(require sicp-pict)
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+** Ex. 2.44 - up-split
+Here we define =up-split=, a procedure used by =corner-split=. It produces
+branches the image into two copies above the original.
+
+#+BEGIN_SRC scheme :session :results output
+(define (up-split painter n)
+  (if (= n 0)
+      painter
+      (let ((smaller (up-split painter (- n 1))))
+        (below
+         painter
+         (beside smaller smaller)))))
+
+(paint (up-split diagonal-shading 3))
+#+END_SRC
+
+#+RESULTS:
+** Ex. 2.45 - split
+Earlier, we were abstracting the patterns of combining painters. Now, we start
+to abstract away the patterns of combining painter =operations=. Here we define
+a generic =split= procedure such that we can re-define =right-split= and
+=up-split= as:
+#+BEGIN_SRC scheme
+(define (right-split) (split beside below))
+(define (up-split) (split below beside))
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+#+BEGIN_SRC scheme :session :exports both
+(define (split primary-split secondary-split)
+  (lambda (painter n)
+    (if (= n 0)
+        painter
+        (let ((divided ((split primary-split secondary-split) painter (- n 1))))
+          (primary-split painter divided)))))
+
+(define (right-split) (split beside below))
+(define (up-split) (split below beside))
+
+(paint ((right-split) diagonal-shading 3))
+(paint ((up-split) diagonal-shading 3))
+#+END_SRC
+
+#+RESULTS:
+: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439058701543905870160.png>
+
+** Ex. 2.46
+Before doing more work with =painter=, we need to implement the concept of
+frames. We use coordinates in the unit square to describe images. We then need
+to map images to fit arbitrary frames. We can do this by using vector
+operations.
+
+Given a vector $\vec{v}=(x,y)$ representing the coordinate in an image, we can
+map it to the sum $\text{Origin}(\text{Frame}) + x\cdot
+\text{Edge}_1(\text{Frame}) + y\cdot \text{Edge}_2(\text{Frame})$, which will
+translate it into the frame's coordinate map.
+
+To do this, we first need a data abstraction for vectors and their basic
+operations (scaling, adding, and subtracting).
+
+#+BEGIN_SRC scheme :session
+(define (make-vect x-cor y-cor)
+  (list x-cor y-cor))
+
+(define (xcor-vect vect)
+  (car vect))
+
+(define (ycor-vect vect)
+  (cadr vect))
+
+(define (scale-vect scalar vect)
+  (make-vect
+   (* scalar (xcor-vect vect))
+   (* scalar (ycor-vect vect))))
+
+(define (add-vect vec1 vec2)
+  (make-vect
+   (+ (xcor-vect vec1) (xcor-vect vec2))
+   (+ (ycor-vect vec1) (ycor-vect vec2))))
+
+(define (sub-vect vec1 vec2)
+  (make-vect
+   (- (xcor-vect vec1) (xcor-vect vec2))
+   (- (ycor-vect vec1) (ycor-vect vec2))))
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+#+BEGIN_SRC scheme :session :exports both :results output
+(define vec1 (make-vect 3 5))
+(define vec2 (make-vect -1 2))
+(scale-vect 5 vec1)
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC scheme :session :exports both :results output
+(add-vect vec1 vec2)
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC scheme :session :exports both :results output
+(sub-vect vec1 vec2)
+#+END_SRC
+
+#+RESULTS:
+
+Now we can create coordinate maps for frames with this procedure:
+#+BEGIN_SRC scheme :session
+(define (frame-coord-map frame)
+  (lambda (v)
+    (add-vect
+     (origin-frame frame)
+     (add-vect (scale-vect (xcor-vect v)
+                           (edge1-frame frame))
+               (scale-vect (ycor-vect v)
+                           (edge2-frame frame))))))
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+** Ex. 2.47
+Now we define constructors and selectors for two different representations of frames:
+#+BEGIN_SRC scheme :session
+(define (make-frame origin edge1 edge2)
+  (list origin edge1 edge2))
+(define (origin-frame frame)
+  (car frame))
+(define (edge1-frame frame)
+  (cadr frame))
+(define (edge2-frame frame)
+  (caddr frame))
+
+(define (make-frame-c origin edge1 edge2)
+  (cons origin (cons edge1 edge2)))
+(define (origin-frame-c frame)
+  (car frame))
+(define (edge1-frame-c frame)
+  (cadr frame))
+(define (edge2-frame-c frame)
+  (cddr frame))
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+** Ex. 2.48
+We can use the vector representations to represent line segments. A line segment
+consists of a vector from the origin to the starting point, and a second vector
+from the origin to the ending point.
+#+BEGIN_SRC scheme :session
+(define (make-segment vec1 vec2)
+  (list vec1 vec2))
+
+(define (start-segment segment)
+  (car segment))
+
+(define (end-segment segment)
+  (cadr segment))
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+** Ex. 2.49
+We can use the following procedure to create painters from lists of segments:
+#+BEGIN_SRC scheme
+(define (segments->painter segment-list)
+  (lambda (frame)
+    (for-each
+     (lambda (segment)
+       (draw-line
+        ((frame-coord-map frame) (start-segment segment))
+        ((frame-coord-map frame) (end-segment segment))))
+     segment-list)))
+
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+*** Painter that draws the outline of the frame
+#+BEGIN_SRC scheme :session new
+(require compatibility/mlist)
+(require sicp)
+(require sicp-pict)
+
+(define (outline-painter)
+  (let ((los (list
+              (make-segment (make-vect 0 0) (make-vect 0 1))
+              (make-segment (make-vect 0 1) (make-vect 1 1))
+              (make-segment (make-vect 1 1) (make-vect 1 0))
+              (make-segment (make-vect 1 0) (make-vect 0 0)))))
+    (segments->painter (mlist->list los))))
+
+(paint (outline-painter))
+
+#+END_SRC
+
+#+RESULTS:
+: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439059461543905946696.png>
+
+*** Painter that draws an X
+#+BEGIN_SRC scheme :session new
+(define (x-painter)
+  (let ((los (list
+              (make-segment (make-vect 0 0) (make-vect 1 1))
+              (make-segment (make-vect 0 1) (make-vect 1 0)))))
+    (segments->painter (mlist->list los))))
+
+(paint (x-painter))
+#+END_SRC
+
+#+RESULTS:
+: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439060751543906075251.png>
+
+*** Painter that draws a diamond
+#+BEGIN_SRC scheme :session new
+(define (diamond-painter)
+  (let ((los (list
+              (make-segment (make-vect 0 0.5) (make-vect 0.5 1))
+              (make-segment (make-vect 0.5 1) (make-vect 1 0.5))
+              (make-segment (make-vect 1 0.5) (make-vect 0.5 0))
+              (make-segment (make-vect 0.5 0) (make-vect 0 0.5)))))
+    (segments->painter (mlist->list los))))
+
+(paint (diamond-painter))
+#+END_SRC
+
+#+RESULTS:
+: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439062381543906238247.png>
+
+*** Wave painter
+#+BEGIN_SRC scheme :session new
+(define (wave-painter)
+  (let ((los (list
+              (make-segment (make-vect 0 0.8) (make-vect 0.1 0.5))
+              (make-segment (make-vect 0.1 0.5) (make-vect 0.2 0.55))
+              (make-segment (make-vect 0.2 0.55) (make-vect 0.3 0.55))
+              (make-segment (make-vect 0.3 0.55) (make-vect 0.25 0.8))
+              (make-segment (make-vect 0.25 0.8) (make-vect 0.3 1))
+              (make-segment (make-vect 0.5 1) (make-vect 0.55 .8))
+              (make-segment (make-vect 0.55 0.8) (make-vect 0.5 .55))
+              (make-segment (make-vect 0.5 0.55) (make-vect 0.7 .55))
+              (make-segment (make-vect 0.7 0.55) (make-vect 1 .3))
+              (make-segment (make-vect 1 0.2) (make-vect 0.6 0.4))
+              (make-segment (make-vect 0.6 0.4) (make-vect 0.8 0))
+              (make-segment (make-vect 0.6 0) (make-vect 0.4 0.3))
+              (make-segment (make-vect 0.4 0.3) (make-vect 0.2 0))
+              (make-segment (make-vect 0.1 0) (make-vect 0.2 0.4))
+              (make-segment (make-vect 0.2 0.4) (make-vect 0.15 0.45))
+              (make-segment (make-vect 0.15 0.45) (make-vect 0.1 0.35))
+              (make-segment (make-vect 0.1 0.35) (make-vect 0 0.6)))))
+    (segments->painter (mlist->list los))))
+
+(paint (wave-painter))
+#+END_SRC
+
