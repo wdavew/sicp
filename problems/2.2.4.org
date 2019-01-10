@@ -73,7 +73,7 @@ a generic =split= procedure such that we can re-define =right-split= and
 #+END_SRC
 
 #+RESULTS:
-: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439058701543905870160.png>
+: #<Image: /var/tmp/geiser-img-15470909431547090943927.png>
 
 ** Ex. 2.46
 Before doing more work with =painter=, we need to implement the concept of
@@ -89,7 +89,7 @@ translate it into the frame's coordinate map.
 To do this, we first need a data abstraction for vectors and their basic
 operations (scaling, adding, and subtracting).
 
-#+BEGIN_SRC scheme :session
+#+BEGIN_SRC scheme :session sub
 (define (make-vect x-cor y-cor)
   (list x-cor y-cor))
 
@@ -232,7 +232,7 @@ We can use the following procedure to create painters from lists of segments:
 #+END_SRC
 
 #+RESULTS:
-: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439059461543905946696.png>
+: #<Image: /var/tmp/geiser-img-15470977941547097794168.png>
 
 *** Painter that draws an X
 #+BEGIN_SRC scheme :session new
@@ -246,7 +246,7 @@ We can use the following procedure to create painters from lists of segments:
 #+END_SRC
 
 #+RESULTS:
-: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439060751543906075251.png>
+: #<Image: /var/tmp/geiser-img-15470978011547097801030.png>
 
 *** Painter that draws a diamond
 #+BEGIN_SRC scheme :session new
@@ -262,7 +262,7 @@ We can use the following procedure to create painters from lists of segments:
 #+END_SRC
 
 #+RESULTS:
-: #<Image: /var/folders/5l/_7c_3sps22741kt8tcsl2txc0000gn/T/geiser-img-15439062381543906238247.png>
+: #<Image: /var/tmp/geiser-img-15470978021547097802638.png>
 
 *** Wave painter
 #+BEGIN_SRC scheme :session new
@@ -290,3 +290,96 @@ We can use the following procedure to create painters from lists of segments:
 (paint (wave-painter))
 #+END_SRC
 
+#+RESULTS:
+: #<Image: /var/tmp/geiser-img-15470978041547097804503.png>
+
+** Transforming and combining painters
+We can build operations that alter how painters behave simply by transforming
+frames. An operation such as =flip-vert= doesn't need to know the details of how
+a painter works. Instead, it just needs to know how to flip a frame upside down
+and then invoke the painter on that new frame.
+
+*** Transform-painter definition
+#+BEGIN_SRC scheme
+(define (transform-painter painter origin corner1 corner2)
+  (lambda (frame)
+    (let ((m (frame-coord-map frame)))
+      (let ((new-origin (m origin)))
+        (painter
+         (make-frame new-origin
+                     (sub-vect (m corner1) new-origin)
+                     (sub-vect (m corner2) new-origin)))))))
+#+END_SRC
+
+#+RESULTS:
+: #<void>
+
+*** Flip painter
+#+begin_src scheme :session new
+(define (flip-vertical painter)
+  (transform-painter painter
+                     (make-vect 0.0 1.0)
+                     (make-vect 1.0 1.0)
+                     (make-vect 0.0 0.0)))
+(paint (flip-vertical (wave-painter)))
+#+END_SRC
+
+#+RESULTS:
+: #<Image: /var/tmp/geiser-img-15470978131547097813811.png>
+
+*** Flip painter
+As another example, this abstraction makes it easy to put painters beside each
+other in one frame by using two sub-frames.
+#+begin_src scheme :session new
+(define (beside painter1 painter2)
+  (let ((split-point (make-vect 0.5 0.0)))
+    (let ((paint-left
+           (transform-painter painter1
+                              (make-vect 0.0 0.0)
+                              split-point
+                              (make-vect 0.0 1.0)))
+          (paint-right
+           (transform-painter painter2
+                              split-point
+                              (make-vect 1.0 0)
+                              (make-vect 0.5 1.0))))
+      (lambda (frame)
+        (paint-left frame)
+        (paint-right frame)))))
+
+(paint (beside (flip-vertical einstein) einstein))
+#+END_SRC
+
+#+RESULTS:
+: #<Image: /var/tmp/geiser-img-15470978351547097835935.png>
+
+** Ex. 2.50
+Similar to =flip-vertical= and =beside=, we can define an operation
+=flip-horiz=, =rotate180=, and =rotate270=:
+
+#+begin_src scheme :session new
+(define (flip-horiz painter)
+  (transform-painter painter
+                     (make-vect 1.0 0.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.0 1.0)))
+
+(define (rotate-180 painter)
+  (transform-painter painter
+                     (make-vect 1.0 1.0)
+                     (make-vect 0.0 1.0)
+                     (make-vect 1.0 0.0)))
+
+(define (rotate-270 painter)
+  (transform-painter painter
+                     (make-vect 0.0 1.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.0 1.0)))
+
+(paint (beside einstein (flip-horiz einstein)))
+(paint (beside einstein (rotate-180 einstein)))
+(paint (rotate-270 einstein))
+#+END_SRC
+
+#+RESULTS:
+: #<Image: /var/tmp/geiser-img-15470979431547097943038.png>
