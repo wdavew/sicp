@@ -1,0 +1,82 @@
+#+TITLE: 2.3.1 Quotation for symbolic data
+
+** Ex. 2.53
+What will the interpreter print in response to evaluating each of the following?
+#+BEGIN_SRC scheme
+(list 'a 'b 'c)
+#+END_SRC
+
+#+RESULTS:
+| a | b | c |
+
+Should print =(a b c)=
+
+#+BEGIN_SRC scheme
+(list (list 'george'))
+Should print =((george))=
+#+END_SRC
+
+#+BEGIN_SRC scheme
+(cdr '((x1 x2) (y1 y2)))
+#+END_SRC
+
+#+RESULTS:
+| y1 | y2 |
+
+Should print =((y1 y2))=
+
+#+BEGIN_SRC scheme
+(cadr '((x1 x2) (y1 y2)))
+#+END_SRC
+
+#+RESULTS:
+| y1 | y2 |
+
+Should print =(y1 y2)=
+
+#+BEGIN_SRC scheme
+(pair? (car '(a short list)))
+#+END_SRC
+
+Should print =f=
+
+#+BEGIN_SRC scheme
+(memq 'red '((red shoes) (blue socks)))
+#+END_SRC
+
+Should print =f=
+
+#+BEGIN_SRC scheme
+(memq 'red '(red shoes blue socks))
+#+END_SRC
+
+Should print =(red shoes blue socks)=
+
+** Ex. 2.54
+We can define =equal?= for lists recursively by using =eq?= on symbols
+
+#+BEGIN_SRC scheme
+(define (equal? l1 l2)
+  (cond ((and (pair? l1) (pair? l2))
+          (and (equal? (car l1) (car l2))
+          (equal? (cdr l1) (cdr l2))))
+          ((and (not (pair? l1)) (not (pair? l2)))
+         (eq? l1 l2))
+         (else #f)))
+
+(equal? '(1 2 3) '(1 2 3))
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+** Ex. 2.55
+The following expressions prints back =quote=:
+
+#+BEGIN_SRC scheme
+(car ''abracadabra)
+#+END_SRC
+
+It does so because the ='abracadabra= is shorthand for evaluating =(quote abracadabra)=.
+So, it follows that =''abracadabra= represents the actual list =(quote abracadabra)=,
+and the =car= of this expression is simply =quote=.
