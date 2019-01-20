@@ -1,0 +1,223 @@
+#+TITLE: 2.3.2 Symbolic Differentiation
+
+To illustrate symbol manipulation in Lisp, we can use the example of finding the
+derivative of an algebraic expression, i.e. $\frac{d}{dx}(ax^2 + bx + c) =
+2ax + b$.
+
+* Differentiation procedure
+We'll start by defining the procedures at the most abstract level assuming we
+have some representation of expressions. Then, we can define procedures such as
+~make-sum~, ~make-product~; predicates such as ~sum?~, ~product?~, ~variable?~;
+and selectors like ~multiplier~ and ~multiplicand~.
+
+Here's a simple (incomplete) procedure that handles differentiation rules
+assuming we have these representations available:
+
+#+BEGIN_SRC scheme :session
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp)
+         (if (same-variable? exp var) 1 0))
+        ((sum? exp)
+         (make-sum
+          (deriv (addend exp) var)
+          (deriv (augend exp) var)))
+        ((product? exp)
+         (make-sum
+          (make-product (multiplier exp)
+                        (deriv (multiplicand exp) var))
+          (make-product (multiplicand exp)
+                        (deriv (multiplier exp) var))))
+         (else
+          (error "unknown expression type -- DERIV" exp))))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+This is actually all we need once we've defined the representations.
+
+** Defining the representations
+As a first approach, we can just represent expressions using lists of symbols
+that follow the same syntax as standard Lisp expressions:
+
+#+BEGIN_SRC scheme :session
+(define (variable? x) (symbol? x))
+
+(define (same-variable? x y)
+  (and (variable? x) (variable? y) (eq? x y)))
+
+(define (make-sum a b)
+  (list '+ a b))
+
+(define (make-product a b)
+  (list '* a b))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+To test whether an expression is a sum, we just need to check if the first
+symbol is ~+~ or ~*~:
+#+BEGIN_SRC scheme :session
+(define (sum? a)
+  (and (pair? a) (eq? (car a) '+)))
+
+(define (product? a)
+  (and (pair? a) (eq? (car a) '*)))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+For our selectors, we just select the second or third items of the list:
+#+BEGIN_SRC scheme :session
+(define (addend a) (cadr a))
+
+(define (augend a) (caddr a))
+
+(define (multiplier a) (cadr a))
+
+(define (multiplicand a) (caddr a))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+Now we can actually produce the differentiated expressions:
+#+BEGIN_SRC scheme :session :results value :exports both
+(deriv '(+ x 3) 'x)
+#+END_SRC
+
+#+RESULTS:
+| + | 1 | 0 |
+
+#+BEGIN_SRC scheme :session :results value :exports both
+(deriv '(* x 3) 'x)
+#+END_SRC
+
+#+RESULTS:
+| + | (* x 0) | (* 3 1) |
+
+#+BEGIN_SRC scheme :session :results value :exports both
+(deriv '(* (* x y) (+ x 3)) 'x)
+#+END_SRC
+
+#+RESULTS:
+| + | (* (* x y) (+ 1 0)) | (* (+ x 3) (+ (* x 0) (* y 1))) |
+
+The problem now is that the results aren't simplified.
+
+** Simplifying results
+We can simplify the results without touching the higher level ~deriv~ procedure
+and instead manipulate our representation of expressions. For example, we can
+change ~make-sum~ and ~make-product~ to produce simpler expressions if they
+involve identities or if both arguments are primitives instead of other
+expressions:
+
+#+BEGIN_SRC scheme :session :results value :exports both
+(define (make-sum a b)
+  (cond ((and (number? a) (= a 0)) b)
+        ((and (number? b) (= b 0)) a)
+        ((and (number? a) (number? b) (+ a b)))
+        (else (list '+ a b))))
+
+(deriv '(+ x 3) 'x)
+#+END_SRC
+
+#+RESULTS:
+: 1
+
+
+#+BEGIN_SRC scheme :session :results value :exports both
+(define (make-product a b)
+  (cond ((and (number? a) (= a 1)) b)
+        ((and (number? b) (= b 1)) a)
+        ((or (and (number? a) (= 0 a)) (and (number? b) (= 0 b))) 0)
+        ((and (number? a) (number? b) (* a b)))
+        (else (list '* a b))))
+
+(deriv '(* x 3) 'x)
+#+END_SRC
+
+#+RESULTS:
+: 3
+
+#+BEGIN_SRC scheme :session :results value :exports both
+(deriv '(* (* x y) (+ x 3)) 'x)
+#+END_SRC
+
+#+RESULTS:
+| + | (* x y) | (* (+ x 3) y) |
+
+While producing a "simplest" form might depend on context and there is more to
+do, this is at least much better than before.
+
+** Ex. 2.56
+We should add exponentiation to our derivative program. We can do this by adding
+a new clause in ~deriv~, defining constructors and selectors for exponents, and
+using the symbol ~**~ as representation.
+
+#+BEGIN_SRC scheme :results value :session :exports both
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp)
+         (if (same-variable? exp var) 1 0))
+        ((exponentiation? exp)
+          (make-product
+           (deriv (base exp) var)
+           (make-product (exponent exp)
+                        (make-exponentiation (base exp) (- (exponent exp) 1)))))
+        ((sum? exp)
+         (make-sum
+          (deriv (addend exp) var)
+          (deriv (augend exp) var)))
+        ((product? exp)
+         (make-sum
+          (make-product (multiplier exp)
+                        (deriv (multiplicand exp) var))
+          (make-product (multiplicand exp)
+                        (deriv (multiplier exp) var))))
+         (else
+          (error "unknown expression type -- DERIV" exp))))
+
+(define (exponentiation? exp)
+  (and (pair? exp) (eq? '** (car exp))))
+
+(define (make-exponentiation base exp)
+  (cond ((= 0 exp) 1)
+        ((= 1 exp) base)
+        (else (list '** base exp))))
+
+(define (base exponentiation)
+  (cadr exponentiation))
+
+(define (exponent exponentiation)
+  (caddr exponentiation))
+
+(deriv '(** x 3) 'x)
+#+END_SRC
+
+#+RESULTS:
+| 3 | (** x 2) |
+
+#+BEGIN_SRC scheme :results value :session :exports both
+(deriv '(* (** x 3) (* (+ x 3) y)) 'x)
+#+END_SRC
+
+#+RESULTS:
+| + | (* (** x 3) y) | (* (* (+ x 3) y) (* 3 (** x 2))) |
+
+#+BEGIN_SRC scheme :results value :session :exports both
+(deriv '(** x 2) 'x)
+#+END_SRC
+
+#+RESULTS:
+| 2 | x |
+
+#+BEGIN_SRC scheme :results value :session :exports both
+(deriv '(** x 1) 'x)
+#+END_SRC
+
+#+RESULTS:
+: 1
