@@ -90,21 +90,18 @@ Now we can actually produce the differentiated expressions:
 #+END_SRC
 
 #+RESULTS:
-| + | 1 | 0 |
 
 #+BEGIN_SRC scheme :session :results value :exports both
 (deriv '(* x 3) 'x)
 #+END_SRC
 
 #+RESULTS:
-| + | (* x 0) | (* 3 1) |
 
 #+BEGIN_SRC scheme :session :results value :exports both
 (deriv '(* (* x y) (+ x 3)) 'x)
 #+END_SRC
 
 #+RESULTS:
-| + | (* (* x y) (+ 1 0)) | (* (+ x 3) (+ (* x 0) (* y 1))) |
 
 The problem now is that the results aren't simplified.
 
@@ -126,7 +123,6 @@ expressions:
 #+END_SRC
 
 #+RESULTS:
-: 1
 
 
 #+BEGIN_SRC scheme :session :results value :exports both
@@ -141,14 +137,12 @@ expressions:
 #+END_SRC
 
 #+RESULTS:
-: 3
 
 #+BEGIN_SRC scheme :session :results value :exports both
 (deriv '(* (* x y) (+ x 3)) 'x)
 #+END_SRC
 
 #+RESULTS:
-| + | (* x y) | (* (+ x 3) y) |
 
 While producing a "simplest" form might depend on context and there is more to
 do, this is at least much better than before.
@@ -221,3 +215,26 @@ using the symbol ~**~ as representation.
 
 #+RESULTS:
 : 1
+
+** Ex. 2.57
+Now we'd like to handle sums and products with an arbitrary number of terms,
+rather than limiting our procedures to expressions of only two terms. Again, we
+can do this by just limiting our changes to the representations of sums and
+products without touching the actual derivative procedure.
+
+#+BEGIN_SRC scheme :results value :session :exports both
+(define (augend a)
+  (if (null? (cdddr a))
+             (caddr a)
+             (cons '+ (cddr a))))
+
+(define (multiplicand a)
+  (if (null? (cdddr a))
+             (caddr a)
+             (cons '* (cddr a))))
+
+(deriv '(* x y (+ x 3)) 'x)
+#+END_SRC
+
+#+RESULTS:
+| + | (* x y) | (* y (+ x 3)) |
