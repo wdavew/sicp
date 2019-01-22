@@ -90,18 +90,21 @@ Now we can actually produce the differentiated expressions:
 #+END_SRC
 
 #+RESULTS:
+| + | 1 | 0 |
 
 #+BEGIN_SRC scheme :session :results value :exports both
 (deriv '(* x 3) 'x)
 #+END_SRC
 
 #+RESULTS:
+| + | (* x 0) | (* 3 1) |
 
 #+BEGIN_SRC scheme :session :results value :exports both
 (deriv '(* (* x y) (+ x 3)) 'x)
 #+END_SRC
 
 #+RESULTS:
+| + | (* (* x y) (+ 1 0)) | (* (+ x 3) (+ (* x 0) (* y 1))) |
 
 The problem now is that the results aren't simplified.
 
@@ -123,6 +126,7 @@ expressions:
 #+END_SRC
 
 #+RESULTS:
+: 1
 
 
 #+BEGIN_SRC scheme :session :results value :exports both
@@ -137,12 +141,14 @@ expressions:
 #+END_SRC
 
 #+RESULTS:
+: 3
 
 #+BEGIN_SRC scheme :session :results value :exports both
 (deriv '(* (* x y) (+ x 3)) 'x)
 #+END_SRC
 
 #+RESULTS:
+| + | (* x y) | (* (+ x 3) y) |
 
 While producing a "simplest" form might depend on context and there is more to
 do, this is at least much better than before.
@@ -238,3 +244,81 @@ products without touching the actual derivative procedure.
 
 #+RESULTS:
 | + | (* x y) | (* y (+ x 3)) |
+
+** Ex. 2.58
+We can also make modifications to the selectors and representations so that
+infix notation works instead of prefix.
+
+*** a. Fully parenthesized, binary infix expressions
+#+BEGIN_SRC scheme :results value :session :exports both
+(define (variable? x) (symbol? x))
+
+(define (sum? a)
+  (and (pair? a) (pair? (cdr a)) (eq? (cadr a) '+)))
+
+(define (product? a)
+  (and (pair? a) (pair? (cdr a)) (eq? (cadr a) '*)))
+
+(define (addend a)
+  (car a))
+
+(define (augend a)
+  (caddr a))
+
+(define (multiplier a)
+  (car a))
+
+(define (multiplicand a)
+  (caddr a))
+
+(define (exponentiation? exp)
+  (and (pair? exp) (pair? (cdr exp)) (eq? '** (cadr exp))))
+
+(define (make-exponentiation base exp)
+  (cond ((= 0 exp) 1)
+        ((= 1 exp) base)
+        (else (list base '** exp))))
+
+(define (base exponentiation)
+  (car exponentiation))
+
+(define (exponent exponentiation)
+  (caddr exponentiation))
+
+(define (make-sum a b)
+  (cond ((and (number? a) (= a 0)) b)
+        ((and (number? b) (= b 0)) a)
+        ((and (number? a) (number? b) (+ a b)))
+        (else (list a '+ b))))
+
+(define (make-product a b)
+  (cond ((and (number? a) (= a 1)) b)
+        ((and (number? b) (= b 1)) a)
+        ((or (and (number? a) (= 0 a)) (and (number? b) (= 0 b))) 0)
+        ((and (number? a) (number? b) (* a b)))
+        (else (list a '* b))))
+
+(deriv '(x + (3 * (x + (y + 2)))) 'x)
+(deriv '((x ** 3) + (5 + ( 2 * x)))  'x)
+#+END_SRC
+
+#+RESULTS:
+| (3 * (x ** 2)) | + | 2 |
+
+*** b. Standard algebraic notation
+#+BEGIN_SRC scheme :results value :session :exports both
+(define (augend a)
+  (if (null? (cdddr a))
+      (caddr a)
+      (cddr a)))
+
+(define (multiplicand a)
+  (if (null? (cdddr a))
+      (caddr a)
+      (cddr a)))
+
+(deriv '(x + 3 * (x + y + 2)) 'x)
+#+END_SRC
+
+#+RESULTS:
+: 4
