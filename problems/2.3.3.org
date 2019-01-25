@@ -155,3 +155,141 @@ Now we redefine ~union-set~. This implementation runs in O(n) time.
 
 #+RESULTS:
 | 1 | 2 | 3 | 4 | 6 | 7 |
+
+** Binary Trees
+Assuming the tree is balanced, a binary tree will allow us to bring
+~element-set~ to O(log(n)) time.
+
+*** Tree representation
+#+BEGIN_SRC scheme :exports both :session
+(define (entry-tree tree)
+  (car tree))
+
+(define (left-branch-tree tree)
+  (cadr tree))
+
+(define (right-branch-tree tree)
+  (caddr tree))
+
+(define (make-tree entry left right)
+  (list entry left right))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+*** Finding an element in a set using the tree
+#+BEGIN_SRC scheme :exports both :session
+(define (element-of-set? x set)
+  (cond ((null? set) #false)
+        ((= x (entry-tree set)) #true)
+        ((< x (entry-tree set)) (element-of-set? x (left-branch-tree set)))
+        (else (element-of-set? x (right-branch-tree set)))))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+*** Adjoining to a set
+#+BEGIN_SRC scheme :exports both :session
+(define (adjoin-set x set)
+  (cond ((null? set) (make-tree x '() '()))
+        ((= x (entry-tree set)) set)
+        ((< x (entry-tree set))
+         (make-tree
+          (entry-tree set)
+          (adjoin-set x (left-branch-tree set))
+          (right-branch-tree set)))
+        (else
+         (make-tree
+          (entry-tree set)
+          (left-branch-tree set)
+          (adjoin-set x (right-branch-tree set))))))
+#+END_SRC
+
+#+RESULTS:
+: #<unspecified>
+
+This works if our tree is balanced, but we'll be back at O(n) growth if it's
+highly unbalanced.
+
+*** Ex. 2.63
+Here are two procedures for converting a tree to a list:
+
+#+BEGIN_SRC scheme :session
+(define (tree->list-1 tree)
+  (if (null? tree)
+      '()
+      (append
+       (tree->list-1 (left-branch-tree tree))
+       (cons (entry-tree tree) (tree->list-1 (right-branch-tree tree))))))
+
+(define (tree->list-2 tree)
+  (define (copy-to-list tree result-list)
+    (if (null? tree)
+        result-list
+        (copy-to-list
+         (left-branch-tree tree)
+         (cons (entry-tree tree)
+               (copy-to-list
+                (right-branch-tree tree)
+                result-list)))))
+  (copy-to-list tree '()))
+
+(define (test-tree)
+  (make-tree
+   7
+   (make-tree
+    3
+    (make-tree
+     1
+     '()
+     '())
+    (make-tree
+     5
+     '()
+     '()))
+   (make-tree
+    9
+    '()
+    (make-tree
+     11
+     '()
+     '()))))
+
+(define (test-tree-2)
+  (make-tree
+   3
+   (make-tree
+    1
+    '()
+    '())
+   (make-tree
+    7
+    (make-tree
+     5
+     '()
+     '())
+    (make-tree
+     9
+     '()
+     (make-tree
+      11
+      '()
+      '())))))
+
+
+(equal? (tree->list-1 (test-tree-2)) (tree->list-2 (test-tree-2)))
+#+END_SRC
+
+#+RESULTS:
+: #t
+
+These procedures both produce the same lists given any valid binary tree.
+However, the order of growth is different. The second procedure just calls
+~cons~ at each node of the tree, while the first one uses ~append~. Append has
+to scan through an entire sublist, making it an O(n) operation. The size of the
+sublists it's appending, though, are reduced by a factor of two each time. So in
+total the time complexity of the first procedure should be O(nlog(n)), and the
+second O(n).
+*** Ex. 2.64
