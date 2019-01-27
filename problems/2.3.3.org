@@ -293,3 +293,54 @@ sublists it's appending, though, are reduced by a factor of two each time. So in
 total the time complexity of the first procedure should be O(nlog(n)), and the
 second O(n).
 *** Ex. 2.64
+This procedure forms a balanced binary tree given an ordered list of elements.
+#+BEGIN_SRC scheme :exports both :session
+(define (list->tree-elements elements)
+  (car (partial-tree elements (length elements))))
+
+(define (partial-tree elts n)
+  (if (= n 0)
+      (cons '() elts)
+      (let ((left-size (quotient (- n 1) 2)))
+        (let ((left-result (partial-tree elts left-size)))
+          (let ((left-tree (car left-result))
+                (non-left-elements (cdr left-result))
+                (right-size (- n (+ left-size 1))))
+            (let ((this-entry (car non-left-elements))
+                  (right-result (partial-tree (cdr non-left-elements) right-size)))
+              (let ((right-tree (car right-result))
+                    (remaining-elements (cdr right-result)))
+                (cons
+                 (make-tree this-entry left-tree right-tree)
+                 remaining-elements))))))))
+
+(partial-tree '(1 2 3 4 5) 0)
+#+END_SRC
+
+#+RESULTS:
+| (1 nil nil) | 2 | 3 | 4 | 5 |
+
+This procedure splits the list into three pieces -- the result of recursively
+calling the procedure on the left half, the midpoint, and the result of
+recursively calling the procedure on the right half. The results are combined to
+form a balanced binary tree.
+
+This is an O(n) time procedure sinc eit just has to visit each element of the
+list once to form the tree.
+
+*** Ex. 2.65
+Now we can give implementions of ~union-set~ and ~intersection-set~ for sets
+represented with binary trees.
+
+#+BEGIN_SRC scheme :session :exports both
+(define (union-set-tree a b)
+  (let ((list-a (tree->list-2 a))
+        (list-b (tree->list-2 b)))
+    (let ((union-list (union-set list-a list-b)))
+      (list->tree-elements union-list))))
+
+(tree->list-2 (union-set-tree (list->tree-elements '(1 2 3 4 5)) (list->tree-elements '(5 6 7 8))))
+#+END_SRC
+
+#+RESULTS:
+| 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
