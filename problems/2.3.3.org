@@ -344,3 +344,53 @@ represented with binary trees.
 
 #+RESULTS:
 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+
+*** Ex. 2.6.6
+If we think about a database, we could use sets to retrieve items. Given a
+selector ~key~, we can define a ~lookup~ procedure similar to ~element-of-set?~
+that uses the key to find an existing record or return false if no such record
+exists.
+
+The initial database could be implemented with a representation of sets based on
+underfeed lists to keep things simple, and then later moved to another
+representation that uses binary trees. If the actual database procedures are
+limited to working with selectors and constructors, then we can change the
+representation without affecting those procedures.
+
+Here is the ~lookup~ procedure for the case where we've implemented sets as
+binary trees:
+
+#+BEGIN_SRC scheme :session :exports both
+(define (make-record key record)
+  (cons key record))
+
+(define (key record)
+  (car record))
+
+(define (data record)
+  (cdr record))
+
+(define (test-db)
+  (list
+   (make-record 1 "a")
+   (make-record 2 "b")
+   (make-record 3 "b")
+   (make-record 4 "c")
+   (make-record 5 "d")
+   (make-record 6 "e")
+   (make-record 7 "f")))
+
+(define (lookup k db)
+  (if (or (null? db) (null? (entry-tree db)))
+      #false
+      (cond ((= k (key (entry-tree db)))
+             (data (entry-tree db)))
+            ((< k (key (entry-tree db)))
+             (lookup k (left-branch-tree db)))
+            (else (lookup k (right-branch-tree db))))))
+
+(lookup 6 (list->tree-elements (test-db)))
+#+END_SRC
+
+#+RESULTS:
+: e
